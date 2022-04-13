@@ -9,7 +9,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.core.Response;
 
 @ApplicationScoped
 @Path("reproducer")
@@ -22,22 +21,18 @@ public class RestService {
 
     @GET
     @Path("configureClients")
-    public Response createClientsWithTracing(@QueryParam("times") Integer times) {
+    public double createClientsWithTracing(@QueryParam("times") Integer times) {
 
         // Configure tracing on the ClientBuilder a bunch of times. This alone is sufficient to provoke the instance leak.
         for (int i = 0; i < (null != times ? times : DEFAULT_TIMES); i++) {
             ClientBuilder restClientBuilder = ResteasyClientBuilder.newBuilder();
+            // This call creates the instance of the Tracer that is never released
             ClientTracingRegistrar.configure(restClientBuilder);
         }
 
         // Trigger a full Garbage Collection run to get the real blocked memory size later.
         System.gc();
-
-        // Request the current heap size to calculate the utilization
-        HeapStatisticJson heapStatistic =
-                new HeapStatisticJson(runtime.totalMemory() - runtime.freeMemory(), runtime.totalMemory(), runtime.maxMemory());
-
-        // Send everything back to the client
-        return Response.ok().entity(heapStatistic).build();
+        // Calculate the heap utilization and send it back to the client
+        return ((1d * (runtime.totalMemory() - runtime.freeMemory())) / runtime.maxMemory()) * 100;
     }
 }
