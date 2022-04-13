@@ -19,23 +19,34 @@ public class Main {
 
         System.out.printf("Initially, %.2f%% of heap were used%n", initiallyUsedHeap);
 
-        double heapUtilizationAfterFirstBatch = step(client, INITIAL_BATCH_SIZE);
-        int initialBatchHeapUsage = (int) Math.ceil(heapUtilizationAfterFirstBatch - initiallyUsedHeap);
-        System.out.printf("%d instances ~= %d%% heap%n", INITIAL_BATCH_SIZE, initialBatchHeapUsage);
+        if (initiallyUsedHeap < TARGET_HEAP_UTILIZATION) {
+            triggerLeak(client, 1);
+            System.out.println("Sending initial batch");
+            double heapUtilizationAfterFirstBatch = step(client, INITIAL_BATCH_SIZE);
+            int initialBatchHeapUsage = (int) Math.ceil(heapUtilizationAfterFirstBatch - initiallyUsedHeap);
 
-        int stepBatchSize =
-                (int) (((INITIAL_BATCH_SIZE / initialBatchHeapUsage) * (TARGET_HEAP_UTILIZATION - heapUtilizationAfterFirstBatch)) / STEPS_TO_TARGET);
-        System.out.printf("Sending %d more batches with size %d to reach target utilization %d%%%n", STEPS_TO_TARGET, stepBatchSize, TARGET_HEAP_UTILIZATION);
+            if (heapUtilizationAfterFirstBatch < TARGET_HEAP_UTILIZATION) {
+                System.out.printf("%d instances ~= %d%% heap%n", INITIAL_BATCH_SIZE, initialBatchHeapUsage);
+                int stepBatchSize =
+                        (int) (((INITIAL_BATCH_SIZE / initialBatchHeapUsage) * (TARGET_HEAP_UTILIZATION - heapUtilizationAfterFirstBatch)) / STEPS_TO_TARGET);
+                System.out.printf("Sending %d more batches with size %d to reach target utilization %d%%%n", STEPS_TO_TARGET, stepBatchSize,
+                        TARGET_HEAP_UTILIZATION);
 
-        for (int i = 0; i < STEPS_TO_TARGET; i++) {
-            step(client, stepBatchSize);
+                for (int i = 0; i < STEPS_TO_TARGET; i++) {
+                    step(client, stepBatchSize);
+                }
+            } else {
+                System.out.printf("... which already is past the target utilization of %d%%", TARGET_HEAP_UTILIZATION);
+            }
+        } else {
+            System.out.printf("... which already is past the target utilization of %d%%", TARGET_HEAP_UTILIZATION);
         }
     }
 
     private static double step(HttpClient client, int batchSize) throws IOException, InterruptedException {
         System.out.printf("Triggering memory leak for %d instances...", batchSize);
         double currentlyUsedHeap = triggerLeak(client, batchSize);
-        System.out.printf("now %.2f%% of heap are blocked.%n", currentlyUsedHeap);
+        System.out.printf("now %.2f%% of heap are blocked%n", currentlyUsedHeap);
         return currentlyUsedHeap;
     }
 
